@@ -1,0 +1,58 @@
+name: dotnet6-azureappservice
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CAMINHO_PROJETO_WEBAPP: ./SiteContagem
+  NOME_DIR_PUBLICACAO: app
+  NOME_ARTIFACT_PUBLICACAO: PublicacaoSiteContagem
+  NOME_WEBAPP: groffegithubactionscontagem
+  
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup .NET 6
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.0.100-preview.5.21302.13
+        
+    - name: Build + Publish com o utilitario dotnet
+      run: dotnet publish ${{ env.CAMINHO_PROJETO_WEBAPP }} -c Release -o ${{ env.NOME_DIR_PUBLICACAO }}
+
+    - name: Upload da Publicação como Artifact
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: ${{ env.NOME_ARTIFACT_PUBLICACAO }}
+        path: ${{ env.NOME_DIR_PUBLICACAO }}
+        
+  deployment:
+    needs: [build]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download do Artifact contendo a Publicação
+        uses: actions/download-artifact@v2.0.10
+        with:
+          name: ${{ env.NOME_ARTIFACT_PUBLICACAO }}
+          path: ${{ env.NOME_DIR_PUBLICACAO }}
+    
+      - name: Login no Azure
+        uses: Azure/login@v1.1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deployment no Azure App Service (Ambiente de Testes)
+        uses: Azure/webapps-deploy@v2.2.3
+        with:
+          app-name: ${{ env.NOME_WEBAPP }}
+          package: ${{ env.NOME_DIR_PUBLICACAO }}
